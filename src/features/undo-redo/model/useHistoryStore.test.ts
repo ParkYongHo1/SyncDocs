@@ -22,7 +22,6 @@ describe("useHistoryStore", () => {
   });
 
   it("undo하면 undoStack에서 빠지고 redoStack에 쌓인다", () => {
-    // TODO: execute 먼저 하고, undo 호출해서 확인해보기
     const command = {
       id: "1",
       blockId: "A",
@@ -40,8 +39,6 @@ describe("useHistoryStore", () => {
   });
 
   it("invalidateForBlock은 해당 blockId의 Command만 제거한다", () => {
-    // TODO: 두 개의 다른 blockId Command를 execute해두고,
-    //       invalidateForBlock 호출 후 undoStack 확인해보기
     const command1 = {
       id: "1",
       blockId: "A",
