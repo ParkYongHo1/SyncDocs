@@ -1,29 +1,75 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Undo2, Redo2, CheckCircle2, WifiOff } from "lucide-react";
 import { WelcomeSection } from "./WelcomeSection";
 import { useCurrentUser } from "@/entities/auth/model/useCurrentUser";
 import { useSignInMutation } from "@/entities/auth/model/useSignInMutation";
 import { useSignOutMutation } from "@/entities/auth/model/useSignOutMutation";
+import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/mantine";
+import { useHistoryStore } from "@/features/undo-redo/model/useHistoryStore";
+import "@blocknote/core/fonts/inter.css";
+import "@blocknote/mantine/style.css";
+import { useEditorSync } from "../model/useEditorSync";
 
 const dummyDocuments = [
   { id: "1", title: "Q3 launch plan" },
   { id: "2", title: "Onboarding redesign spec" },
 ];
 
+const customDarkTheme = {
+  colors: {
+    editor: {
+      text: "#E3E3E3",
+      background: "transparent",
+    },
+    menu: {
+      text: "#E3E3E3",
+      background: "#1A1A1A",
+    },
+  },
+};
+
+const currentDocument = { title: "Untitled", isReadonly: false };
+
 export default function Editor() {
   const { data: user, isLoading } = useCurrentUser();
   const { mutate: signIn } = useSignInMutation();
   const { mutate: signOut } = useSignOutMutation();
-  console.log(user);
+  const editor = useCreateBlockNote({
+    initialContent: [
+      {
+        type: "heading",
+        content: "",
+      },
+    ],
+    placeholders: {
+      heading: "새 파일",
+      default: "내용을 입력하세요...",
+    },
+  });
 
-  const handleLogin = async () => {
+  useEditorSync(editor);
+
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+
+  const [isOnline] = useState(true);
+
+  const handleLogin = () => {
     signIn();
   };
-  const handleLogout = async () => {
+
+  const handleLogout = () => {
     signOut();
   };
+
+  const handleTitleSave = () => {
+    setIsEditingTitle(false);
+  };
+
   if (isLoading) {
     return null;
   }
@@ -77,22 +123,84 @@ export default function Editor() {
         )}
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0">
         {user ? (
-          <div className="px-8 py-10 max-w-4xl mx-auto">
-            <div className="w-full max-w-2xl space-y-4">
-              <h1 className="text-[14px] font-semibold text-white">
-                Q3 launch plan
-              </h1>
-              <div className="bg-[#1A1A1A] rounded-xl px-6 py-8 text-gray-500 text-[14px]">
-                (여기에 실제 BlockNote 편집기가 들어갈 자리)
+          <>
+            <header className="h-14 border-b border-[#1F1F1F] flex items-center justify-between px-8 shrink-0">
+              <div className="flex items-center gap-3">
+                {isEditingTitle ? (
+                  <input
+                    autoFocus
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleTitleSave();
+                      if (e.key === "Escape") setIsEditingTitle(false);
+                    }}
+                    className="text-[14px] font-semibold text-white bg-[#1A1A1A] border border-[#2D2D2D] rounded-md px-2 py-1 outline-none focus:border-blue-500"
+                  />
+                ) : (
+                  <h1
+                    onClick={() => {
+                      if (!currentDocument || currentDocument.isReadonly)
+                        return;
+                      setTitleDraft(currentDocument.title);
+                      setIsEditingTitle(true);
+                    }}
+                    className={`text-[14px] font-semibold text-white ${
+                      currentDocument && !currentDocument.isReadonly
+                        ? "cursor-pointer hover:text-gray-300"
+                        : ""
+                    }`}
+                  >
+                    {currentDocument?.title ?? "Untitled"}
+                  </h1>
+                )}
               </div>
-            </div>
-          </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1 bg-[#1A1A1A] p-0.5 rounded-lg border border-[#2A2A2A]">
+                  <button
+                    onClick={() => useHistoryStore.getState().undo()}
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#262626]"
+                    aria-label="실행 취소"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => useHistoryStore.getState().redo()}
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#262626]"
+                    aria-label="다시 실행"
+                  >
+                    <Redo2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {isOnline ? (
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1 rounded-full bg-[#18261F] text-[#4ade80] border border-[#1e3a27]">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Online
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1 rounded-full bg-[#2A1414] text-[#F87171] border border-[#5A1A1A]">
+                    <WifiOff className="w-3.5 h-3.5" />
+                    Offline
+                  </div>
+                )}
+              </div>
+            </header>
+
+            <main className="flex-1 overflow-y-auto">
+              <div className="px-8 py-10 max-w-4xl mx-auto">
+                <BlockNoteView editor={editor} theme={customDarkTheme} />
+              </div>
+            </main>
+          </>
         ) : (
-          <WelcomeSection />
+          <main className="flex-1 overflow-y-auto">
+            <WelcomeSection />
+          </main>
         )}
-      </main>
+      </div>
     </div>
   );
 }
