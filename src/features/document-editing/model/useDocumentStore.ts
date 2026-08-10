@@ -4,9 +4,10 @@ import type { Block } from "@/entities/block/model/types";
 type DocumentState = {
   blocks: Block[];
   currentDocumentId: string | null;
-
+  isApplyingProgrammaticChange: boolean;
+  setIsApplyingProgrammaticChange: (value: boolean) => void;
   setBlocks: (blocks: Block[]) => void;
-
+  setCurrentDocumentId: (id: string) => void;
   applyContent: (blockId: string, content: unknown) => void;
   markDeleted: (blockId: string) => void;
   addBlocks: (blocks: Block[]) => void;
@@ -18,8 +19,12 @@ type DocumentState = {
 export const useDocumentStore = create<DocumentState>((set) => ({
   blocks: [],
   currentDocumentId: null,
+  isApplyingProgrammaticChange: false,
 
   setBlocks: (blocks) => set({ blocks }),
+  setCurrentDocumentId: (id) => set({ currentDocumentId: id }),
+  setIsApplyingProgrammaticChange: (value) =>
+    set({ isApplyingProgrammaticChange: value }),
 
   applyContent: (blockId, content) => {
     set((state) => ({
@@ -44,11 +49,12 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   },
 
   addBlocks: (blocks) => {
-    set((state) => ({
-      blocks: [...state.blocks, ...blocks],
-    }));
+    set((state) => {
+      const blockMap = new Map(state.blocks.map((b) => [b.id, b]));
+      blocks.forEach((b) => blockMap.set(b.id, b));
+      return { blocks: Array.from(blockMap.values()) };
+    });
   },
-
   restoreBlock: (block) => {
     set((state) => {
       const existingIndex = state.blocks.findIndex((b) => b.id === block.id);

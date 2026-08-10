@@ -13,6 +13,7 @@ import { useHistoryStore } from "@/features/undo-redo/model/useHistoryStore";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEditorSync } from "../model/useEditorSync";
+import { useDocumentInit } from "../model/useDocumentInit";
 
 const dummyDocuments = [
   { id: "1", title: "Q3 launch plan" },
@@ -52,7 +53,7 @@ export default function Editor() {
   });
 
   useEditorSync(editor);
-
+  const { currentDocumentId, isInitializing } = useDocumentInit(editor, user);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
 

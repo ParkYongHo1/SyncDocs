@@ -1,30 +1,93 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { BlockNoteEditor } from "@blocknote/core";
 import { useHistoryStore } from "@/features/undo-redo/model/useHistoryStore";
-import { createUpdateBlockCommand } from "@/features/undo-redo/lib/create-commands";
+import {
+  createDeleteCommand,
+  createUpdateBlockCommand,
+} from "@/features/undo-redo/lib/create-commands";
+import { useDocumentStore } from "./useDocumentStore";
+import {
+  createBlock,
+  restoreDeletedBlock,
+  softDeleteBlock,
+} from "@/entities/block/api";
+import { useUpdateBlockMutation } from "./useUpdateBlockMutation";
+import { Block } from "@/entities/block/model/types";
 
 export function useEditorSync(editor: BlockNoteEditor) {
-  const isApplyingHistoryRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { mutate: updateBlockMutate } = useUpdateBlockMutation();
 
+  const debouncedSendToServer = useCallback(
+    (blockId: string, content: unknown, baseVersion: number) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        updateBlockMutate({ blockId, content, baseVersion });
+      }, 400);
+    },
+    [updateBlockMutate],
+  );
   const applyContent = useCallback(
     (blockId: string, content: unknown) => {
-      isApplyingHistoryRef.current = true;
+      useDocumentStore.getState().setIsApplyingProgrammaticChange(true);
       editor.updateBlock(blockId, { content } as never);
+      useDocumentStore.getState().applyContent(blockId, content);
+
+      const block = useDocumentStore
+        .getState()
+        .blocks.find((b) => b.id === blockId);
+      if (block) {
+        debouncedSendToServer(blockId, content, block.version);
+      }
+
       setTimeout(() => {
-        isApplyingHistoryRef.current = false;
+        useDocumentStore.getState().setIsApplyingProgrammaticChange(false);
       }, 0);
+    },
+    [editor, debouncedSendToServer],
+  );
+  const markDeleted = useCallback((blockId: string) => {
+    useDocumentStore.getState().markDeleted(blockId);
+    softDeleteBlock(blockId).catch((error) => {
+      console.error("Failed to soft delete block:", error);
+    });
+  }, []);
+
+  const restoreDeletedBlockFn = useCallback(
+    (block: Block) => {
+      useDocumentStore.getState().setIsApplyingProgrammaticChange(true);
+
+      const lastBlock = editor.document[editor.document.length - 1];
+      if (lastBlock) {
+        editor.insertBlocks([block as never], lastBlock.id, "after");
+      } else {
+        editor.insertBlocks([block as never], editor.document[0]?.id, "before");
+      }
+
+      setTimeout(() => {
+        useDocumentStore.getState().setIsApplyingProgrammaticChange(false);
+      }, 0);
+
+      useDocumentStore.getState().restoreBlock(block);
+      restoreDeletedBlock(block.id).catch((error) => {
+        console.error("Failed to restore deleted block:", error);
+      });
     },
     [editor],
   );
-
   useEffect(() => {
     const cleanup = editor.onChange((_editor, { getChanges }) => {
-      if (isApplyingHistoryRef.current) {
+      const isApplying =
+        useDocumentStore.getState().isApplyingProgrammaticChange;
+
+      if (isApplying) {
         return;
       }
 
       const changes = getChanges();
-      console.log("Changes detected:", changes);
+
       changes.forEach((change) => {
         if (change.source.type === "undo" || change.source.type === "redo") {
           return;
@@ -38,24 +101,78 @@ export function useEditorSync(editor: BlockNoteEditor) {
             applyContent,
           );
           useHistoryStore.getState().execute(command);
+
+          const block = useDocumentStore
+            .getState()
+            .blocks.find((b) => b.id === change.block.id);
+          if (!block) {
+            console.warn(
+              "블록을 찾을 수 없음, 서버 전송 무시:",
+              change.block.id,
+            );
+            return;
+          }
+          debouncedSendToServer(
+            change.block.id,
+            change.block.content,
+            block.version,
+          );
+        }
+        if (change.type === "insert") {
+          const documentId = useDocumentStore.getState().currentDocumentId;
+          if (!documentId) return;
+
+          const order = editor.document.findIndex(
+            (b) => b.id === change.block.id,
+          );
+
+          useDocumentStore.getState().addBlocks([
+            {
+              id: change.block.id,
+              documentId,
+              order,
+              content: change.block.content,
+              version: 0,
+              updatedBy: "",
+              updatedAt: Date.now(),
+              deletedAt: null,
+            },
+          ]);
+          createBlock({
+            id: change.block.id,
+            documentId,
+            order,
+            content: change.block.content,
+          })
+            .then((createdBlock) => {
+              useDocumentStore.getState().addBlocks([createdBlock]);
+            })
+            .catch((error) => {
+              console.error("블록 생성 실패:", error);
+            });
         }
         if (change.type === "delete") {
-          // TODO: 채워보기
-          // 힌트: 지금은 서버 연동 전이라, markDeleted/restoreBlock을
-          //       useDocumentStore에서 그대로 가져다 쓸 순 없어(그 스토어는
-          //       Block 타입 전체를 요구하니까). 지금 단계에서는
-          //       "Undo/Redo가 로컬에서 동작하는 것"만 확인하는 게 목표니,
-          //       일단 console.log(change)로 change.block이 어떤 모양인지
-          //       확인해보는 것부터 시작해도 돼.
-        }
+          const block = useDocumentStore
+            .getState()
+            .blocks.find((b) => b.id === change.block.id);
+          if (!block) return;
 
-        if (change.type === "insert") {
-          // TODO: 채워보기 (지금은 서버에 저장 안 하니, 일단 로그만 찍어서
-          //       insert가 어떻게 감지되는지 확인)
+          const command = createDeleteCommand(
+            block,
+            markDeleted,
+            restoreDeletedBlockFn,
+          );
+          useHistoryStore.getState().execute(command);
         }
       });
     });
 
     return cleanup;
-  }, [editor, applyContent]);
+  }, [
+    editor,
+    applyContent,
+    debouncedSendToServer,
+    markDeleted,
+    restoreDeletedBlockFn,
+  ]);
 }
