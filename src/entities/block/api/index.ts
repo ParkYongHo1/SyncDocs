@@ -6,6 +6,7 @@ function mapToBlock(row: {
   document_id: string;
   order: number;
   content: unknown;
+  type: string;
   version: number;
   updated_by: string;
   updated_at: string;
@@ -16,6 +17,7 @@ function mapToBlock(row: {
     documentId: row.document_id,
     order: row.order,
     content: row.content,
+    type: row.type,
     version: row.version,
     updatedBy: row.updated_by,
     updatedAt: new Date(row.updated_at).getTime(),
@@ -29,6 +31,7 @@ export async function fetchBlocks(documentId: string): Promise<Block[]> {
     .from("blocks")
     .select("*")
     .eq("document_id", documentId)
+    .is("deleted_at", null)
     .order("order", { ascending: true });
 
   if (error) throw error;
@@ -40,6 +43,7 @@ export async function createBlock(block: {
   documentId: string;
   order: number;
   content: unknown;
+  type: string;
 }): Promise<Block> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -49,6 +53,7 @@ export async function createBlock(block: {
       document_id: block.documentId,
       order: block.order,
       content: block.content,
+      type: block.type,
     })
     .select()
     .single();

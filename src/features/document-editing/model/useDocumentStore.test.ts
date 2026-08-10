@@ -7,6 +7,7 @@ const makeBlock = (overrides: Partial<Block> = {}): Block => ({
   documentId: "doc-1",
   order: 0,
   content: "원본",
+  type: "paragraph",
   version: 1,
   updatedBy: "user-1",
   updatedAt: Date.now(),

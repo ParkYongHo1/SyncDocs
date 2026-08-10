@@ -36,6 +36,7 @@ export function useDocumentInit(
               documentId: document.id,
               order: index,
               content: block.content,
+              type: block.type,
             }),
           ),
         );
@@ -43,7 +44,7 @@ export function useDocumentInit(
       } else {
         const blockNoteBlocks = blocks.map((b) => ({
           id: b.id,
-          type: "paragraph",
+          type: b.type,
           content: b.content,
         }));
         useDocumentStore.getState().setIsApplyingProgrammaticChange(true);

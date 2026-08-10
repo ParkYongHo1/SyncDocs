@@ -14,6 +14,7 @@ import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEditorSync } from "../model/useEditorSync";
 import { useDocumentInit } from "../model/useDocumentInit";
+import { useDocumentStore } from "../model/useDocumentStore";
 
 const dummyDocuments = [
   { id: "1", title: "Q3 launch plan" },
@@ -39,6 +40,7 @@ export default function Editor() {
   const { data: user, isLoading } = useCurrentUser();
   const { mutate: signIn } = useSignInMutation();
   const { mutate: signOut } = useSignOutMutation();
+
   const editor = useCreateBlockNote({
     initialContent: [
       {
@@ -56,6 +58,7 @@ export default function Editor() {
   const { currentDocumentId, isInitializing } = useDocumentInit(editor, user);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const { onCompositionStart, onCompositionEnd } = useEditorSync(editor);
 
   const [isOnline] = useState(true);
 
@@ -192,7 +195,12 @@ export default function Editor() {
 
             <main className="flex-1 overflow-y-auto">
               <div className="px-8 py-10 max-w-4xl mx-auto">
-                <BlockNoteView editor={editor} theme={customDarkTheme} />
+                <div
+                  onCompositionStart={onCompositionStart}
+                  onCompositionEnd={onCompositionEnd}
+                >
+                  <BlockNoteView editor={editor} theme={customDarkTheme} />
+                </div>
               </div>
             </main>
           </>

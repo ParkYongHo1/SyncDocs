@@ -24,6 +24,9 @@ export function useEditorSync(editor: BlockNoteEditor) {
         clearTimeout(debounceTimerRef.current);
       }
       debounceTimerRef.current = setTimeout(() => {
+        if (useDocumentStore.getState().isComposing) {
+          return;
+        }
         updateBlockMutate({ blockId, content, baseVersion });
       }, 400);
     },
@@ -77,6 +80,23 @@ export function useEditorSync(editor: BlockNoteEditor) {
     },
     [editor],
   );
+  const handleCompositionStart = useCallback(() => {
+    useDocumentStore.getState().setIsComposing(true);
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    useDocumentStore.getState().setIsComposing(false);
+
+    const cursorPosition = editor.getTextCursorPosition();
+    const currentBlock = cursorPosition.block;
+
+    const block = useDocumentStore
+      .getState()
+      .blocks.find((b) => b.id === currentBlock.id);
+    if (!block) return;
+
+    debouncedSendToServer(currentBlock.id, currentBlock.content, block.version);
+  }, [editor, debouncedSendToServer]);
   useEffect(() => {
     const cleanup = editor.onChange((_editor, { getChanges }) => {
       const isApplying =
@@ -132,6 +152,7 @@ export function useEditorSync(editor: BlockNoteEditor) {
               documentId,
               order,
               content: change.block.content,
+              type: change.block.type,
               version: 0,
               updatedBy: "",
               updatedAt: Date.now(),
@@ -143,9 +164,12 @@ export function useEditorSync(editor: BlockNoteEditor) {
             documentId,
             order,
             content: change.block.content,
+            type: change.block.type,
           })
             .then((createdBlock) => {
-              useDocumentStore.getState().addBlocks([createdBlock]);
+              useDocumentStore
+                .getState()
+                .setVersion(createdBlock.id, createdBlock.version);
             })
             .catch((error) => {
               console.error("블록 생성 실패:", error);
@@ -175,4 +199,8 @@ export function useEditorSync(editor: BlockNoteEditor) {
     markDeleted,
     restoreDeletedBlockFn,
   ]);
+  return {
+    onCompositionStart: handleCompositionStart,
+    onCompositionEnd: handleCompositionEnd,
+  };
 }

@@ -5,7 +5,9 @@ type DocumentState = {
   blocks: Block[];
   currentDocumentId: string | null;
   isApplyingProgrammaticChange: boolean;
+  isComposing: boolean;
   setIsApplyingProgrammaticChange: (value: boolean) => void;
+  setIsComposing: (value: boolean) => void;
   setBlocks: (blocks: Block[]) => void;
   setCurrentDocumentId: (id: string) => void;
   applyContent: (blockId: string, content: unknown) => void;
@@ -20,11 +22,12 @@ export const useDocumentStore = create<DocumentState>((set) => ({
   blocks: [],
   currentDocumentId: null,
   isApplyingProgrammaticChange: false,
-
+  isComposing: false,
   setBlocks: (blocks) => set({ blocks }),
   setCurrentDocumentId: (id) => set({ currentDocumentId: id }),
   setIsApplyingProgrammaticChange: (value) =>
     set({ isApplyingProgrammaticChange: value }),
+  setIsComposing: (value) => set({ isComposing: value }),
 
   applyContent: (blockId, content) => {
     set((state) => ({
