@@ -33,16 +33,22 @@ export function useEditorSync(editor: BlockNoteEditor) {
     [updateBlockMutate],
   );
   const applyContent = useCallback(
-    (blockId: string, content: unknown) => {
+    (
+      blockId: string,
+      content: unknown,
+      options?: { skipServerSync?: boolean },
+    ) => {
       useDocumentStore.getState().setIsApplyingProgrammaticChange(true);
       editor.updateBlock(blockId, { content } as never);
       useDocumentStore.getState().applyContent(blockId, content);
 
-      const block = useDocumentStore
-        .getState()
-        .blocks.find((b) => b.id === blockId);
-      if (block) {
-        debouncedSendToServer(blockId, content, block.version);
+      if (!options?.skipServerSync) {
+        const block = useDocumentStore
+          .getState()
+          .blocks.find((b) => b.id === blockId);
+        if (block) {
+          debouncedSendToServer(blockId, content, block.version);
+        }
       }
 
       setTimeout(() => {
@@ -202,5 +208,7 @@ export function useEditorSync(editor: BlockNoteEditor) {
   return {
     onCompositionStart: handleCompositionStart,
     onCompositionEnd: handleCompositionEnd,
+    applyContent,
+    updateBlockMutate,
   };
 }

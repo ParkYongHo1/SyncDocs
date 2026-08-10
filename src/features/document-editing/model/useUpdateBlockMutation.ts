@@ -1,13 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { updateBlockContent, fetchBlock } from "@/entities/block/api";
 import { useDocumentStore } from "./useDocumentStore";
+import { useConflictStore } from "@/features/conflict-resolution/model/useConflictStore";
 import type { Block } from "@/entities/block/model/types";
 
 type UpdateBlockVariables = {
   blockId: string;
   content: unknown;
   baseVersion: number;
-  isRetry?: boolean;
 };
 
 type PostgrestError = {
@@ -18,7 +18,7 @@ type PostgrestError = {
 };
 
 export function useUpdateBlockMutation() {
-  const mutation = useMutation<Block, PostgrestError, UpdateBlockVariables>({
+  return useMutation<Block, PostgrestError, UpdateBlockVariables>({
     mutationFn: async (variables: UpdateBlockVariables) => {
       return updateBlockContent(
         variables.blockId,
@@ -30,30 +30,24 @@ export function useUpdateBlockMutation() {
       useDocumentStore.getState().setVersion(variables.blockId, data.version);
     },
     onError: async (error, variables) => {
-      if (variables.isRetry) {
-        if (error.code !== "PGRST116") {
-          console.error("Failed to update block after retry:", error);
-        }
-        return;
-      }
-
       if (error.code === "PGRST116") {
         try {
-          const latestBlock = await fetchBlock(variables.blockId);
-          mutation.mutate({
+          const serverBlock = await fetchBlock(variables.blockId);
+          useConflictStore.getState().addConflict({
             blockId: variables.blockId,
-            content: variables.content,
-            baseVersion: latestBlock.version,
-            isRetry: true,
+            localContent: variables.content,
+            serverContent: serverBlock.content,
+            serverVersion: serverBlock.version,
           });
         } catch (fetchError) {
-          console.error("Failed to fetch latest block for retry:", fetchError);
+          console.error(
+            "Failed to fetch latest block for conflict:",
+            fetchError,
+          );
         }
       } else {
         console.error("Failed to update block content:", error);
       }
     },
   });
-
-  return mutation;
 }

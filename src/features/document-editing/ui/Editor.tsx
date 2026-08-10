@@ -14,7 +14,8 @@ import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEditorSync } from "../model/useEditorSync";
 import { useDocumentInit } from "../model/useDocumentInit";
-import { useDocumentStore } from "../model/useDocumentStore";
+import { useConflictStore } from "@/features/conflict-resolution/model/useConflictStore";
+import { extractText } from "@/entities/block/lib/extract-text";
 
 const dummyDocuments = [
   { id: "1", title: "Q3 launch plan" },
@@ -54,12 +55,17 @@ export default function Editor() {
     },
   });
 
-  useEditorSync(editor);
+  const {
+    onCompositionStart,
+    onCompositionEnd,
+    applyContent,
+    updateBlockMutate,
+  } = useEditorSync(editor);
   const { currentDocumentId, isInitializing } = useDocumentInit(editor, user);
+  const conflicts = useConflictStore((state) => state.conflicts);
+
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  const { onCompositionStart, onCompositionEnd } = useEditorSync(editor);
-
   const [isOnline] = useState(true);
 
   const handleLogin = () => {
@@ -194,7 +200,88 @@ export default function Editor() {
             </header>
 
             <main className="flex-1 overflow-y-auto">
-              <div className="px-8 py-10 max-w-4xl mx-auto">
+              <div className="px-8 py-10 max-w-4xl mx-auto space-y-4">
+                {conflicts.map((conflict) => (
+                  <div
+                    key={conflict.blockId}
+                    className="bg-[#3B1F1F] text-[#FDE2E2] px-4 py-3 rounded-lg border border-[#5A1A1A] space-y-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg
+                        className="w-5 h-5 text-[#F87171]"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      <span className="text-[14px] font-medium">
+                        This block has a conflict.
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <p className="text-[12px] text-[#FCA5A5]">
+                          Your version
+                        </p>
+                        <div className="bg-[#2A1414] rounded-md px-3 py-2 text-[13px] min-h-10">
+                          {extractText(conflict.localContent)}
+                        </div>
+                        <button
+                          onClick={() => {
+                            applyContent(
+                              conflict.blockId,
+                              conflict.localContent,
+                              { skipServerSync: true },
+                            );
+                            updateBlockMutate({
+                              blockId: conflict.blockId,
+                              content: conflict.localContent,
+                              baseVersion: conflict.serverVersion,
+                            });
+                            useConflictStore
+                              .getState()
+                              .resolveConflict(conflict.blockId);
+                          }}
+                          className="w-full text-[12px] font-semibold bg-[#F87171] text-white px-3 py-1.5 rounded-md hover:bg-[#F87171]/80"
+                        >
+                          Keep this
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <p className="text-[12px] text-[#FCA5A5]">
+                          Server version
+                        </p>
+                        <div className="bg-[#2A1414] rounded-md px-3 py-2 text-[13px] min-h-10">
+                          {extractText(conflict.serverContent)}
+                        </div>
+                        <button
+                          onClick={() => {
+                            applyContent(
+                              conflict.blockId,
+                              conflict.serverContent,
+                              { skipServerSync: true },
+                            );
+                            useConflictStore
+                              .getState()
+                              .resolveConflict(conflict.blockId);
+                          }}
+                          className="w-full text-[12px] font-semibold bg-[#F87171] text-white px-3 py-1.5 rounded-md hover:bg-[#F87171]/80"
+                        >
+                          Keep this
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
                 <div
                   onCompositionStart={onCompositionStart}
                   onCompositionEnd={onCompositionEnd}
