@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Undo2, Redo2, CheckCircle2, WifiOff } from "lucide-react";
+import {
+  Plus,
+  Undo2,
+  Redo2,
+  CheckCircle2,
+  WifiOff,
+  Trash2,
+  FileText,
+} from "lucide-react";
 import { WelcomeSection } from "./WelcomeSection";
 import { useCurrentUser } from "@/entities/auth/model/useCurrentUser";
 import { useSignInMutation } from "@/entities/auth/model/useSignInMutation";
@@ -13,14 +21,10 @@ import { useHistoryStore } from "@/features/undo-redo/model/useHistoryStore";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import { useEditorSync } from "../model/useEditorSync";
-import { useDocumentInit } from "../model/useDocumentInit";
+import { useDocumentManager } from "../model/useDocumentManager";
 import { useConflictStore } from "@/features/conflict-resolution/model/useConflictStore";
 import { extractText } from "@/entities/block/lib/extract-text";
-
-const dummyDocuments = [
-  { id: "1", title: "Q3 launch plan" },
-  { id: "2", title: "Onboarding redesign spec" },
-];
+import { useDocumentStore } from "../model/useDocumentStore";
 
 const customDarkTheme = {
   colors: {
@@ -34,8 +38,6 @@ const customDarkTheme = {
     },
   },
 };
-
-const currentDocument = { title: "Untitled", isReadonly: false };
 
 export default function Editor() {
   const { data: user, isLoading } = useCurrentUser();
@@ -61,12 +63,24 @@ export default function Editor() {
     applyContent,
     updateBlockMutate,
   } = useEditorSync(editor);
-  const { currentDocumentId, isInitializing } = useDocumentInit(editor, user);
+
+  const {
+    documentList,
+    currentDocumentId,
+    createNewDocument,
+    deleteDocument,
+    switchDocument,
+  } = useDocumentManager(editor, user);
+
   const conflicts = useConflictStore((state) => state.conflicts);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [isOnline] = useState(true);
+
+  const currentDocument = documentList.find(
+    (doc) => doc.id === currentDocumentId,
+  );
 
   const handleLogin = () => {
     signIn();
@@ -78,6 +92,12 @@ export default function Editor() {
 
   const handleTitleSave = () => {
     setIsEditingTitle(false);
+  };
+
+  const handleDeleteDocument = (e: React.MouseEvent, documentId: string) => {
+    e.stopPropagation();
+    if (!confirm("이 문서를 삭제할까요?")) return;
+    deleteDocument(documentId);
   };
 
   if (isLoading) {
@@ -92,25 +112,57 @@ export default function Editor() {
             SyncDocs Space
           </span>
           {user && (
-            <button className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#222]">
+            <button
+              onClick={() => createNewDocument()}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#222]"
+              aria-label="새 문서"
+            >
               <Plus className="w-4 h-4" />
             </button>
           )}
         </div>
-        <nav className="flex-1 px-3 space-y-0.5">
-          <button className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] text-left bg-[#222] text-white font-semibold border border-[#2D2D2D]">
+        <nav className="flex-1 px-3 space-y-1.5">
+          <button
+            onClick={() =>
+              useDocumentStore.getState().setCurrentDocumentId(null)
+            }
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] text-left ${
+              !currentDocumentId
+                ? "bg-[#222] text-white font-semibold border border-[#2D2D2D]"
+                : "text-gray-500 hover:text-gray-300 hover:bg-[#1A1A1A] font-medium"
+            }`}
+          >
             Welcome to SyncDocs
           </button>
 
           {user &&
-            dummyDocuments.map((doc) => (
-              <button
-                key={doc.id}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] text-left text-gray-500 hover:text-gray-300 hover:bg-[#1A1A1A] font-medium"
-              >
-                {doc.title}
-              </button>
-            ))}
+            documentList.map((doc) => {
+              const active = doc.id === currentDocumentId;
+              return (
+                <button
+                  key={doc.id}
+                  onClick={() => switchDocument(doc.id)}
+                  className={`group w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[14px] text-left ${
+                    active
+                      ? "bg-[#222] text-white font-semibold border border-[#2D2D2D]"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-[#1A1A1A] font-medium"
+                  }`}
+                >
+                  <span className="flex items-center min-w-0">
+                    <FileText
+                      className={`w-4 h-4 shrink-0 inline mr-2.5 ${
+                        active ? "text-blue-400" : "text-gray-600"
+                      }`}
+                    />
+                    <span className="truncate">{doc.title}</span>
+                  </span>
+                  <Trash2
+                    onClick={(e) => handleDeleteDocument(e, doc.id)}
+                    className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400"
+                  />
+                </button>
+              );
+            })}
         </nav>
         {user ? (
           <div className="p-3 border-t border-[#1F1F1F]">
@@ -134,7 +186,7 @@ export default function Editor() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        {user ? (
+        {user && currentDocumentId ? (
           <>
             <header className="h-14 border-b border-[#1F1F1F] flex items-center justify-between px-8 shrink-0">
               <div className="flex items-center gap-3">
@@ -153,16 +205,11 @@ export default function Editor() {
                 ) : (
                   <h1
                     onClick={() => {
-                      if (!currentDocument || currentDocument.isReadonly)
-                        return;
+                      if (!currentDocument) return;
                       setTitleDraft(currentDocument.title);
                       setIsEditingTitle(true);
                     }}
-                    className={`text-[14px] font-semibold text-white ${
-                      currentDocument && !currentDocument.isReadonly
-                        ? "cursor-pointer hover:text-gray-300"
-                        : ""
-                    }`}
+                    className="text-[14px] font-semibold text-white cursor-pointer hover:text-gray-300"
                   >
                     {currentDocument?.title ?? "Untitled"}
                   </h1>
