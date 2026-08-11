@@ -1,13 +1,19 @@
 import { create } from "zustand";
 import type { Block } from "@/entities/block/model/types";
+import type { PendingAction } from "@/features/document-editing/model/types";
 
 type DocumentState = {
   blocks: Block[];
   currentDocumentId: string | null;
   isApplyingProgrammaticChange: boolean;
   isComposing: boolean;
+  isOnline: boolean;
+  pendingActions: PendingAction[];
   setIsApplyingProgrammaticChange: (value: boolean) => void;
   setIsComposing: (value: boolean) => void;
+  setIsOnline: (value: boolean) => void;
+  addPendingAction: (action: PendingAction) => void;
+  clearPendingActions: () => PendingAction[];
   setBlocks: (blocks: Block[]) => void;
   setCurrentDocumentId: (id: string | null) => void;
   applyContent: (blockId: string, content: unknown) => void;
@@ -18,16 +24,29 @@ type DocumentState = {
   setVersion: (blockId: string, version: number) => void;
 };
 
-export const useDocumentStore = create<DocumentState>((set) => ({
+export const useDocumentStore = create<DocumentState>((set, get) => ({
   blocks: [],
   currentDocumentId: null,
   isApplyingProgrammaticChange: false,
   isComposing: false,
+  isOnline: true,
+  pendingActions: [],
+
   setBlocks: (blocks) => set({ blocks }),
   setCurrentDocumentId: (id) => set({ currentDocumentId: id }),
   setIsApplyingProgrammaticChange: (value) =>
     set({ isApplyingProgrammaticChange: value }),
   setIsComposing: (value) => set({ isComposing: value }),
+  setIsOnline: (value) => set({ isOnline: value }),
+
+  addPendingAction: (action) =>
+    set((state) => ({ pendingActions: [...state.pendingActions, action] })),
+
+  clearPendingActions: () => {
+    const current = get().pendingActions;
+    set({ pendingActions: [] });
+    return current;
+  },
 
   applyContent: (blockId, content) => {
     set((state) => ({
@@ -58,6 +77,7 @@ export const useDocumentStore = create<DocumentState>((set) => ({
       return { blocks: Array.from(blockMap.values()) };
     });
   },
+
   restoreBlock: (block) => {
     set((state) => {
       const existingIndex = state.blocks.findIndex((b) => b.id === block.id);

@@ -27,7 +27,17 @@ export function useEditorSync(editor: BlockNoteEditor) {
         if (useDocumentStore.getState().isComposing) {
           return;
         }
-        updateBlockMutate({ blockId, content, baseVersion });
+
+        if (useDocumentStore.getState().isOnline) {
+          updateBlockMutate({ blockId, content, baseVersion });
+        } else {
+          useDocumentStore.getState().addPendingAction({
+            type: "update",
+            blockId,
+            content,
+            baseVersion,
+          });
+        }
       }, 400);
     },
     [updateBlockMutate],
@@ -59,6 +69,12 @@ export function useEditorSync(editor: BlockNoteEditor) {
   );
   const markDeleted = useCallback((blockId: string) => {
     useDocumentStore.getState().markDeleted(blockId);
+
+    if (!useDocumentStore.getState().isOnline) {
+      useDocumentStore.getState().addPendingAction({ type: "delete", blockId });
+      return;
+    }
+
     softDeleteBlock(blockId).catch((error) => {
       console.error("Failed to soft delete block:", error);
     });
@@ -80,6 +96,15 @@ export function useEditorSync(editor: BlockNoteEditor) {
       }, 0);
 
       useDocumentStore.getState().restoreBlock(block);
+
+      if (!useDocumentStore.getState().isOnline) {
+        useDocumentStore.getState().addPendingAction({
+          type: "restore",
+          blockId: block.id,
+        });
+        return;
+      }
+
       restoreDeletedBlock(block.id).catch((error) => {
         console.error("Failed to restore deleted block:", error);
       });
@@ -165,6 +190,17 @@ export function useEditorSync(editor: BlockNoteEditor) {
               deletedAt: null,
             },
           ]);
+          if (!useDocumentStore.getState().isOnline) {
+            useDocumentStore.getState().addPendingAction({
+              type: "insert",
+              blockId: change.block.id,
+              documentId,
+              order,
+              content: change.block.content,
+              blockType: change.block.type,
+            });
+            return;
+          }
           createBlock({
             id: change.block.id,
             documentId,
@@ -186,7 +222,6 @@ export function useEditorSync(editor: BlockNoteEditor) {
             .getState()
             .blocks.find((b) => b.id === change.block.id);
           if (!block) return;
-
           const command = createDeleteCommand(
             block,
             markDeleted,

@@ -3,8 +3,9 @@ import {
   fetchDocuments,
   createDocument,
   deleteDocument as deleteDocumentApi,
+  updateDocumentTitle,
 } from "@/entities/document/api";
-import { fetchBlocks } from "@/entities/block/api";
+import { createBlock, fetchBlocks } from "@/entities/block/api";
 import { useDocumentStore } from "./useDocumentStore";
 import type { BlockNoteEditor } from "@blocknote/core";
 
@@ -41,6 +42,16 @@ export function useDocumentManager(
         editor.replaceBlocks(editor.document, [
           { type: "heading", content: "" },
         ] as never);
+
+        const newBlock = editor.document[0];
+        const createdBlock = await createBlock({
+          id: newBlock.id,
+          documentId: currentDocumentId!,
+          order: 0,
+          content: newBlock.content,
+          type: newBlock.type,
+        });
+        useDocumentStore.getState().setBlocks([createdBlock]);
       } else {
         const blockNoteBlocks = blocks.map((b) => ({
           id: b.id,
@@ -59,6 +70,7 @@ export function useDocumentManager(
       return blocks;
     },
     enabled: !!currentDocumentId,
+    refetchOnReconnect: false,
   });
 
   const createMutation = useMutation({
@@ -86,6 +98,18 @@ export function useDocumentManager(
       }
     },
   });
+  const updateTitleMutation = useMutation({
+    mutationFn: ({
+      documentId,
+      title,
+    }: {
+      documentId: string;
+      title: string;
+    }) => updateDocumentTitle(documentId, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
 
   return {
     documentList: documentListQuery.data ?? [],
@@ -94,5 +118,6 @@ export function useDocumentManager(
     createNewDocument: createMutation.mutate,
     deleteDocument: deleteMutation.mutate,
     switchDocument,
+    updateTitle: updateTitleMutation.mutate,
   };
 }

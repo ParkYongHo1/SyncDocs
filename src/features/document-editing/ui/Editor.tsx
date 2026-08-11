@@ -25,6 +25,7 @@ import { useDocumentManager } from "../model/useDocumentManager";
 import { useConflictStore } from "@/features/conflict-resolution/model/useConflictStore";
 import { extractText } from "@/entities/block/lib/extract-text";
 import { useDocumentStore } from "../model/useDocumentStore";
+import { useOnlineStatus } from "../model/useOnlineStatus";
 
 const customDarkTheme = {
   colors: {
@@ -70,13 +71,16 @@ export default function Editor() {
     createNewDocument,
     deleteDocument,
     switchDocument,
+    updateTitle,
   } = useDocumentManager(editor, user);
 
   const conflicts = useConflictStore((state) => state.conflicts);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
-  const [isOnline] = useState(true);
+
+  useOnlineStatus();
+  const isOnline = useDocumentStore((state) => state.isOnline);
 
   const currentDocument = documentList.find(
     (doc) => doc.id === currentDocumentId,
@@ -91,6 +95,9 @@ export default function Editor() {
   };
 
   const handleTitleSave = () => {
+    if (currentDocumentId && titleDraft.trim()) {
+      updateTitle({ documentId: currentDocumentId, title: titleDraft });
+    }
     setIsEditingTitle(false);
   };
 
