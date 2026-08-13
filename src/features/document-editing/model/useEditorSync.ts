@@ -173,6 +173,8 @@ export function useEditorSync(editor: BlockNoteEditor) {
           const documentId = useDocumentStore.getState().currentDocumentId;
           if (!documentId) return;
 
+          const content = change.block.content ?? [];
+
           const order = editor.document.findIndex(
             (b) => b.id === change.block.id,
           );
@@ -182,7 +184,7 @@ export function useEditorSync(editor: BlockNoteEditor) {
               id: change.block.id,
               documentId,
               order,
-              content: change.block.content,
+              content,
               type: change.block.type,
               version: 0,
               updatedBy: "",
@@ -205,7 +207,7 @@ export function useEditorSync(editor: BlockNoteEditor) {
             id: change.block.id,
             documentId,
             order,
-            content: change.block.content,
+            content,
             type: change.block.type,
           })
             .then((createdBlock) => {
