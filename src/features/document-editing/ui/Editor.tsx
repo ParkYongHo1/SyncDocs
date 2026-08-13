@@ -10,6 +10,8 @@ import {
   WifiOff,
   Trash2,
   FileText,
+  Menu,
+  X,
 } from "lucide-react";
 import { WelcomeSection } from "./WelcomeSection";
 import { useCurrentUser } from "@/entities/auth/model/useCurrentUser";
@@ -78,6 +80,7 @@ export default function Editor() {
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useOnlineStatus();
   const isOnline = useDocumentStore((state) => state.isOnline);
@@ -107,48 +110,86 @@ export default function Editor() {
     deleteDocument(documentId);
   };
 
+  const handleSwitchDocument = (documentId: string) => {
+    switchDocument(documentId);
+    setIsSidebarOpen(false);
+  };
+
+  const handleGoToWelcome = () => {
+    useDocumentStore.getState().setCurrentDocumentId(null);
+    setIsSidebarOpen(false);
+  };
+
   if (isLoading) {
     return null;
   }
-
+  const sortedDocumentList = [...documentList].sort((a, b) => {
+    if (a.isReadonly && !b.isReadonly) return -1;
+    if (!a.isReadonly && b.isReadonly) return 1;
+    return 0;
+  });
   return (
     <div className="flex h-screen overflow-hidden bg-[#0D0D0D] text-[#E3E3E3]">
-      <aside className="w-64 shrink-0 flex flex-col border-r border-[#1F1F1F] bg-[#141414] overflow-y-auto">
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`
+          fixed md:static z-50 h-full w-64 shrink-0 flex flex-col
+          border-r border-[#1F1F1F] bg-[#141414] overflow-y-auto
+          transition-transform duration-200
+          ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+        `}
+      >
         <div className="px-6 py-5 flex items-center justify-between">
           <span className="text-[14px] font-bold tracking-tight text-white">
             SyncDocs Space
           </span>
-          {user && (
+          <div className="flex items-center gap-1">
+            {user && (
+              <button
+                onClick={() => createNewDocument()}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#222]"
+                aria-label="새 문서"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            )}
             <button
-              onClick={() => createNewDocument()}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#222]"
-              aria-label="새 문서"
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden w-7 h-7 rounded-lg flex items-center justify-center text-gray-500 hover:text-gray-200 hover:bg-[#222]"
+              aria-label="메뉴 닫기"
             >
-              <Plus className="w-4 h-4" />
+              <X className="w-4 h-4" />
             </button>
-          )}
+          </div>
         </div>
         <nav className="flex-1 px-3 space-y-1.5">
-          <button
-            onClick={() =>
-              useDocumentStore.getState().setCurrentDocumentId(null)
-            }
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] text-left ${
-              !currentDocumentId
-                ? "bg-[#222] text-white font-semibold border border-[#2D2D2D]"
-                : "text-gray-500 hover:text-gray-300 hover:bg-[#1A1A1A] font-medium"
-            }`}
-          >
-            Welcome to SyncDocs
-          </button>
+          {!user && (
+            <button
+              onClick={handleGoToWelcome}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[14px] text-left ${
+                !currentDocumentId
+                  ? "bg-[#222] text-white font-semibold border border-[#2D2D2D]"
+                  : "text-gray-500 hover:text-gray-300 hover:bg-[#1A1A1A] font-medium"
+              }`}
+            >
+              Welcome to SyncDocs
+            </button>
+          )}
 
           {user &&
-            documentList.map((doc) => {
+            sortedDocumentList.map((doc) => {
               const active = doc.id === currentDocumentId;
+              const isOwner = doc.ownerId === user.id;
               return (
                 <button
                   key={doc.id}
-                  onClick={() => switchDocument(doc.id)}
+                  onClick={() => handleSwitchDocument(doc.id)}
                   className={`group w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-[14px] text-left ${
                     active
                       ? "bg-[#222] text-white font-semibold border border-[#2D2D2D]"
@@ -163,10 +204,12 @@ export default function Editor() {
                     />
                     <span className="truncate">{doc.title}</span>
                   </span>
-                  <Trash2
-                    onClick={(e) => handleDeleteDocument(e, doc.id)}
-                    className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400"
-                  />
+                  {isOwner && (
+                    <Trash2
+                      onClick={(e) => handleDeleteDocument(e, doc.id)}
+                      className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400"
+                    />
+                  )}
                 </button>
               );
             })}
@@ -195,8 +238,16 @@ export default function Editor() {
       <div className="flex-1 flex flex-col min-w-0">
         {user && currentDocumentId ? (
           <>
-            <header className="h-14 border-b border-[#1F1F1F] flex items-center justify-between px-8 shrink-0">
-              <div className="flex items-center gap-3">
+            <header className="h-14 border-b border-[#1F1F1F] flex items-center justify-between px-4 md:px-8 shrink-0">
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                <button
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="md:hidden shrink-0 p-1.5 text-gray-400 hover:text-white"
+                  aria-label="메뉴 열기"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+
                 {isEditingTitle ? (
                   <input
                     autoFocus
@@ -212,17 +263,25 @@ export default function Editor() {
                 ) : (
                   <h1
                     onClick={() => {
-                      if (!currentDocument) return;
+                      if (
+                        !currentDocument ||
+                        currentDocument.ownerId !== user?.id
+                      )
+                        return;
                       setTitleDraft(currentDocument.title);
                       setIsEditingTitle(true);
                     }}
-                    className="text-[14px] font-semibold text-white cursor-pointer hover:text-gray-300"
+                    className={`text-[14px] font-semibold text-white truncate ${
+                      currentDocument?.ownerId === user?.id
+                        ? "cursor-pointer hover:text-gray-300"
+                        : ""
+                    }`}
                   >
                     {currentDocument?.title ?? "Untitled"}
                   </h1>
                 )}
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4 shrink-0">
                 <div className="flex items-center gap-1 bg-[#1A1A1A] p-0.5 rounded-lg border border-[#2A2A2A]">
                   <button
                     onClick={() => useHistoryStore.getState().undo()}
@@ -240,21 +299,21 @@ export default function Editor() {
                   </button>
                 </div>
                 {isOnline ? (
-                  <div className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1 rounded-full bg-[#18261F] text-[#4ade80] border border-[#1e3a27]">
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium px-2 md:px-3 py-1 rounded-full bg-[#18261F] text-[#4ade80] border border-[#1e3a27]">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Online
+                    <span className="hidden sm:inline">Online</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 text-[12px] font-medium px-3 py-1 rounded-full bg-[#2A1414] text-[#F87171] border border-[#5A1A1A]">
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium px-2 md:px-3 py-1 rounded-full bg-[#2A1414] text-[#F87171] border border-[#5A1A1A]">
                     <WifiOff className="w-3.5 h-3.5" />
-                    Offline
+                    <span className="hidden sm:inline">Offline</span>
                   </div>
                 )}
               </div>
             </header>
 
             <main className="flex-1 overflow-y-auto">
-              <div className="px-8 py-10 max-w-4xl mx-auto space-y-4">
+              <div className="px-4 md:px-8 py-6 md:py-10 max-w-4xl mx-auto space-y-4">
                 {conflicts.map((conflict) => (
                   <div
                     key={conflict.blockId}
@@ -279,7 +338,7 @@ export default function Editor() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <p className="text-[12px] text-[#FCA5A5]">
                           Your version
@@ -340,14 +399,27 @@ export default function Editor() {
                   onCompositionStart={onCompositionStart}
                   onCompositionEnd={onCompositionEnd}
                 >
-                  <BlockNoteView editor={editor} theme={customDarkTheme} />
+                  <BlockNoteView
+                    editor={editor}
+                    theme={customDarkTheme}
+                    editable={!currentDocument?.isReadonly}
+                  />
                 </div>
               </div>
             </main>
           </>
         ) : (
           <main className="flex-1 overflow-y-auto">
-            <WelcomeSection />
+            <div className="md:hidden px-4 py-3 border-b border-[#1F1F1F]">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 text-gray-400 hover:text-white"
+                aria-label="메뉴 열기"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            </div>
+            {!user && <WelcomeSection />}
           </main>
         )}
       </div>
