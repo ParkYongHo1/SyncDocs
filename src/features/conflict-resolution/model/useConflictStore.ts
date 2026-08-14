@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type ConflictInfo = {
+export type ConflictInfo = {
   blockId: string;
   localContent: unknown;
   serverContent: unknown;
