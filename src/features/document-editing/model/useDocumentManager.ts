@@ -61,6 +61,19 @@ export function useDocumentManager(
         ] as never);
 
         const newBlock = editor.document[0];
+        useDocumentStore.getState().setBlocks([
+          {
+            id: newBlock.id,
+            documentId: currentDocumentId!,
+            order: 0,
+            content: newBlock.content,
+            type: newBlock.type,
+            version: 0,
+            updatedBy: "",
+            updatedAt: Date.now(),
+            deletedAt: null,
+          },
+        ]);
         const createdBlock = await createBlock({
           id: newBlock.id,
           documentId: currentDocumentId!,
@@ -68,7 +81,9 @@ export function useDocumentManager(
           content: newBlock.content,
           type: newBlock.type,
         });
-        useDocumentStore.getState().setBlocks([createdBlock]);
+        useDocumentStore
+          .getState()
+          .setVersion(createdBlock.id, createdBlock.version);
       } else {
         const blockNoteBlocks = blocks.map((b) => ({
           id: b.id,
