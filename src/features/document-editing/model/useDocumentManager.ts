@@ -41,10 +41,9 @@ export function useDocumentManager(
   };
 
   useEffect(() => {
-    if (user && sortedDocumentList.length > 0 && !currentDocumentId) {
-      useDocumentStore
-        .getState()
-        .setCurrentDocumentId(sortedDocumentList[0].id);
+    const firstDoc = sortedDocumentList[0];
+    if (user && firstDoc?.isReadonly && !currentDocumentId) {
+      useDocumentStore.getState().setCurrentDocumentId(firstDoc.id);
     }
   }, [user, sortedDocumentList, currentDocumentId]);
 

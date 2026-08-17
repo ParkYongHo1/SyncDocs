@@ -161,8 +161,9 @@ describe("useDocumentManager - deleteDocument", () => {
       },
     ];
     vi.mocked(fetchDocuments).mockResolvedValue(docs);
-    vi.mocked(deleteDocument).mockResolvedValue(undefined);
-
+    vi.mocked(deleteDocument).mockImplementation(async () => {
+      vi.mocked(fetchDocuments).mockResolvedValue([]);
+    });
     useDocumentStore.getState().setCurrentDocumentId("doc-a");
 
     const { result } = renderHook(
@@ -178,6 +179,10 @@ describe("useDocumentManager - deleteDocument", () => {
 
     act(() => {
       result.current.deleteDocument("doc-a");
+    });
+
+    await waitFor(() => {
+      expect(result.current.documentList).toHaveLength(0);
     });
 
     await waitFor(() => {

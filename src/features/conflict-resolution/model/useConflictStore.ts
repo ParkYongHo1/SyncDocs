@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type ConflictInfo = {
   blockId: string;
+  documentId: string;
   localContent: unknown;
   serverContent: unknown;
   serverVersion: number;

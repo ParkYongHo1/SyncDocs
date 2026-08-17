@@ -35,6 +35,7 @@ export function useUpdateBlockMutation() {
           const serverBlock = await fetchBlock(variables.blockId);
           useConflictStore.getState().addConflict({
             blockId: variables.blockId,
+            documentId: serverBlock.documentId,
             localContent: variables.content,
             serverContent: serverBlock.content,
             serverVersion: serverBlock.version,

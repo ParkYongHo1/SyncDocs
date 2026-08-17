@@ -4,6 +4,7 @@ import { useConflictStore, type ConflictInfo } from "./useConflictStore";
 function makeConflict(overrides: Partial<ConflictInfo> = {}): ConflictInfo {
   return {
     blockId: "block-1",
+    documentId: "document-1",
     localContent: [{ text: "local" }],
     serverContent: [{ text: "server" }],
     serverVersion: 3,

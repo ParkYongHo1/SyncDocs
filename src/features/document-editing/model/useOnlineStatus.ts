@@ -45,6 +45,7 @@ export function useOnlineStatus() {
                 const serverBlock = await fetchBlock(action.blockId);
                 useConflictStore.getState().addConflict({
                   blockId: action.blockId,
+                  documentId: serverBlock.documentId,
                   localContent: action.content,
                   serverContent: serverBlock.content,
                   serverVersion: serverBlock.version,

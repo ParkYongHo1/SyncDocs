@@ -71,7 +71,9 @@ export default function Editor() {
   } = useDocumentManager(editor, user);
 
   const conflicts = useConflictStore((state) => state.conflicts);
-
+  const documentConflicts = conflicts.filter(
+    (c) => c.documentId === currentDocumentId,
+  );
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useOnlineStatus();
@@ -152,7 +154,7 @@ export default function Editor() {
 
             <main className="flex-1 overflow-y-auto">
               <div className="px-4 md:px-8 py-6 md:py-10 max-w-4xl mx-auto space-y-4">
-                {conflicts.map((conflict) => (
+                {documentConflicts.map((conflict) => (
                   <ConflictBanner
                     key={conflict.blockId}
                     conflict={conflict}
