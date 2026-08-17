@@ -91,13 +91,12 @@ export function useDocumentManager(
           content: b.content,
         }));
         editor.replaceBlocks(editor.document, blockNoteBlocks as never);
+        useDocumentStore.getState().setBlocks(blocks);
       }
 
       setTimeout(() => {
         useDocumentStore.getState().setIsApplyingProgrammaticChange(false);
       }, 0);
-
-      useDocumentStore.getState().setBlocks(blocks);
 
       return blocks;
     },

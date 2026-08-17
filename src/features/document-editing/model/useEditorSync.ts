@@ -16,6 +16,9 @@ import { Block } from "@/entities/block/model/types";
 
 export function useEditorSync(editor: BlockNoteEditor) {
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const composingBlockIdRef = useRef<string | null>(null);
+  const compositionEndTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const { mutate: updateBlockMutate } = useUpdateBlockMutation();
 
   const debouncedSendToServer = useCallback(
@@ -112,22 +115,42 @@ export function useEditorSync(editor: BlockNoteEditor) {
     [editor],
   );
   const handleCompositionStart = useCallback(() => {
+    if (compositionEndTimerRef.current) {
+      clearTimeout(compositionEndTimerRef.current);
+    }
     useDocumentStore.getState().setIsComposing(true);
-  }, []);
+    const cursorPosition = editor.getTextCursorPosition();
+    composingBlockIdRef.current = cursorPosition.block.id;
+  }, [editor]);
 
   const handleCompositionEnd = useCallback(() => {
-    useDocumentStore.getState().setIsComposing(false);
+    if (compositionEndTimerRef.current) {
+      clearTimeout(compositionEndTimerRef.current);
+    }
+    compositionEndTimerRef.current = setTimeout(() => {
+      useDocumentStore.getState().setIsComposing(false);
 
-    const cursorPosition = editor.getTextCursorPosition();
-    const currentBlock = cursorPosition.block;
+      const targetBlockId = composingBlockIdRef.current;
+      if (!targetBlockId) return;
 
-    const block = useDocumentStore
-      .getState()
-      .blocks.find((b) => b.id === currentBlock.id);
-    if (!block) return;
+      const targetBlock = editor.document.find((b) => b.id === targetBlockId);
+      if (!targetBlock) return;
 
-    debouncedSendToServer(currentBlock.id, currentBlock.content, block.version);
-  }, [editor, debouncedSendToServer]);
+      const block = useDocumentStore
+        .getState()
+        .blocks.find((b) => b.id === targetBlockId);
+      if (!block) return;
+
+      updateBlockMutate({
+        blockId: targetBlockId,
+        content: targetBlock.content,
+        baseVersion: block.version,
+      });
+
+      composingBlockIdRef.current = null;
+    }, 50);
+  }, [editor, updateBlockMutate]);
+
   useEffect(() => {
     const cleanup = editor.onChange((_editor, { getChanges }) => {
       const isApplying =
