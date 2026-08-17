@@ -65,6 +65,7 @@ export default function Editor() {
     currentDocumentId,
     createNewDocument,
     deleteDocument,
+    deleteAllMyDocuments,
     switchDocument,
     updateTitle,
   } = useDocumentManager(editor, user);
@@ -112,7 +113,10 @@ export default function Editor() {
       skipServerSync: true,
     });
   };
-
+  const handleLogout = async () => {
+    await deleteAllMyDocuments();
+    signOut();
+  };
   if (isLoading) {
     return null;
   }
@@ -130,7 +134,7 @@ export default function Editor() {
         onDeleteDocument={handleDeleteDocument}
         onGoToWelcome={handleGoToWelcome}
         onLogin={() => signIn()}
-        onLogout={() => signOut()}
+        onLogout={handleLogout}
       />
 
       <div className="flex-1 flex flex-col min-w-0">

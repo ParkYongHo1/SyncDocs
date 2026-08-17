@@ -142,13 +142,22 @@ export function useDocumentManager(
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
   });
-
+  const deleteAllMyDocumentsMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) return;
+      const myDocuments = sortedDocumentList.filter(
+        (d) => d.ownerId === user.id && !d.isReadonly,
+      );
+      await Promise.all(myDocuments.map((doc) => deleteDocumentApi(doc.id)));
+    },
+  });
   return {
     documentList: sortedDocumentList,
     currentDocumentId,
     isBlocksLoading: blocksQuery.isLoading,
     createNewDocument: createMutation.mutate,
     deleteDocument: deleteMutation.mutate,
+    deleteAllMyDocuments: deleteAllMyDocumentsMutation.mutateAsync,
     switchDocument,
     updateTitle: updateTitleMutation.mutate,
   };

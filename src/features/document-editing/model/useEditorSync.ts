@@ -148,7 +148,7 @@ export function useEditorSync(editor: BlockNoteEditor) {
       });
 
       composingBlockIdRef.current = null;
-    }, 50);
+    }, 300);
   }, [editor, updateBlockMutate]);
 
   useEffect(() => {
