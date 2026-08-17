@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchDocuments,
@@ -23,6 +24,14 @@ export function useDocumentManager(
     enabled: !!user,
   });
 
+  const sortedDocumentList = [...(documentListQuery.data ?? [])].sort(
+    (a, b) => {
+      if (a.isReadonly && !b.isReadonly) return -1;
+      if (!a.isReadonly && b.isReadonly) return 1;
+      return 0;
+    },
+  );
+
   const currentDocumentId = useDocumentStore(
     (state) => state.currentDocumentId,
   );
@@ -30,6 +39,14 @@ export function useDocumentManager(
   const switchDocument = (documentId: string) => {
     useDocumentStore.getState().setCurrentDocumentId(documentId);
   };
+
+  useEffect(() => {
+    if (user && sortedDocumentList.length > 0 && !currentDocumentId) {
+      useDocumentStore
+        .getState()
+        .setCurrentDocumentId(sortedDocumentList[0].id);
+    }
+  }, [user, sortedDocumentList, currentDocumentId]);
 
   const blocksQuery = useQuery({
     queryKey: ["blocks", currentDocumentId],
@@ -87,10 +104,10 @@ export function useDocumentManager(
       queryClient.invalidateQueries({ queryKey: ["documents"] });
 
       if (currentDocumentId === deletedDocumentId) {
-        const remaining = documentListQuery.data?.filter(
+        const remaining = sortedDocumentList.filter(
           (d) => d.id !== deletedDocumentId,
         );
-        if (remaining && remaining.length > 0) {
+        if (remaining.length > 0) {
           switchDocument(remaining[0].id);
         } else {
           useDocumentStore.getState().setCurrentDocumentId(null);
@@ -98,6 +115,7 @@ export function useDocumentManager(
       }
     },
   });
+
   const updateTitleMutation = useMutation({
     mutationFn: ({
       documentId,
@@ -112,7 +130,7 @@ export function useDocumentManager(
   });
 
   return {
-    documentList: documentListQuery.data ?? [],
+    documentList: sortedDocumentList,
     currentDocumentId,
     isBlocksLoading: blocksQuery.isLoading,
     createNewDocument: createMutation.mutate,

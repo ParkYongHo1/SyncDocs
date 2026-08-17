@@ -29,12 +29,6 @@ export function Sidebar({
   onLogin,
   onLogout,
 }: SidebarProps) {
-  const sortedDocumentList = [...documentList].sort((a, b) => {
-    if (a.isReadonly && !b.isReadonly) return -1;
-    if (!a.isReadonly && b.isReadonly) return 1;
-    return 0;
-  });
-
   return (
     <>
       {isOpen && (
@@ -90,7 +84,7 @@ export function Sidebar({
           )}
 
           {user &&
-            sortedDocumentList.map((doc) => {
+            documentList.map((doc) => {
               const active = doc.id === currentDocumentId;
               const isOwner = doc.ownerId === user.id;
               return (
